@@ -4,10 +4,10 @@
    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 
    <modelVersion>4.0.0</modelVersion>
-   <groupId>net.sf.json-lib</groupId>
+   <groupId>de.thm.json-lib</groupId>
    <artifactId>json-lib</artifactId>
    <packaging>jar</packaging>
-   <version>2.4.1</version>
+   <version>1.0.0-2.4.1-9e2b337-SNAPSHOT</version>
    <name>json-lib</name>
 
    <url>http://json-lib.sourceforge.net</url>
