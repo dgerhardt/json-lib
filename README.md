@@ -14,6 +14,93 @@ modern JSON parser, I recommend you have a look at
 [Jackson](https://github.com/FasterXML/jackson).
 
 
+### Example
+
+The following example illustrates the differences in parsing between the fork
+and the original library by parsing and serializing JSON and comparing the
+results.
+
+#### Original JSON-like object
+```javascript
+{
+  "str": "abc",
+  "strQuoted": "\"abc\"",
+  "strArray": "[1]",
+  "strQuotedArray": "\"[1]\"",
+  "jsonArray": [1],
+  "strNull": "null",
+  "jsonNull": null,
+  "strInt": "1",
+  "jsonInt": 1,
+  "strObj": "{arrProp: [1], objProp: {a: 1}, strProp: \"[1]\"}",
+  "jsonObject": {
+    "arrProp": [1],
+    "objProp": {
+      "a": 1
+    },
+    "strProp": "[1]"
+  },
+  "strWithFunction": "function () { return false; }",
+  "jsFunction": function () { return false; }
+}
+```
+
+#### Parsing and serialization
+```java
+JSONObject.fromObject(jsonStr).toString(2);
+```
+
+#### Resulting string with original JSON-lib
+```javascript
+{
+  "str": "abc",
+  "strQuoted": "\"abc\"",
+  "strArray": [1],
+  "strQuotedArray": "[1]",
+  "jsonArray": [1],
+  "strNull": null,
+  "jsonNull": null,
+  "strInt": "1",
+  "jsonInt": 1,
+  "strObj":   {
+    "arrProp": [1],
+    "objProp": {"a": 1},
+    "strProp": [1]
+  },
+  "jsonObject":   {
+    "arrProp": [1],
+    "objProp": {"a": 1},
+    "strProp": [1]
+  },
+  "strWithFunction": function(){ return false; },
+  "jsFunction": function(){ return false; }
+}
+```
+
+#### Resulting string with this fork
+```javascript
+{
+  "str": "abc",
+  "strQuoted": "\"abc\"",
+  "strArray": "[1]",
+  "strQuotedArray": "\"[1]\"",
+  "jsonArray": [1],
+  "strNull": "null",
+  "jsonNull": null,
+  "strInt": "1",
+  "jsonInt": 1,
+  "strObj": "{arrProp: [1], objProp: {a: 1}, strProp: \"[1]\"}",
+  "jsonObject":   {
+    "arrProp": [1],
+    "objProp": {"a": 1},
+    "strProp": "[1]"
+  },
+  "strWithFunction": "function () { return false; }",
+  "jsFunction": function(){ return false; }
+}
+```
+
+
 ## Auto-expansion of properties
 
 The XML serialization is extended to handle automatic expansion of properties
