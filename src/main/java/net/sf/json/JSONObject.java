@@ -2385,10 +2385,6 @@ public final class JSONObject extends AbstractJSON implements JSON, Map, Compara
     *         brace)</small>.
     */
    public String toString() {
-      if( isNullObject() ){
-         return JSONNull.getInstance()
-               .toString();
-      }
       try{
          Iterator keys = keys();
          StringBuffer sb = new StringBuffer( "{" );
@@ -2423,10 +2419,6 @@ public final class JSONObject extends AbstractJSON implements JSON, Map, Compara
     * @throws JSONException If the object contains an invalid number.
     */
    public String toString( int indentFactor ) {
-      if( isNullObject() ){
-         return JSONNull.getInstance()
-               .toString();
-      }
       if( indentFactor == 0 ){
          return this.toString();
       }
@@ -2447,10 +2439,6 @@ public final class JSONObject extends AbstractJSON implements JSON, Map, Compara
     * @throws JSONException If the object contains an invalid number.
     */
    public String toString( int indentFactor, int indent ) {
-      if( isNullObject() ){
-         return JSONNull.getInstance()
-               .toString();
-      }
       int i;
       int n = size();
       if( n == 0 ){

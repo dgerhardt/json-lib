@@ -461,17 +461,11 @@ public final class JSONUtils {
     * right places. A backslash will be inserted within </, allowing JSON text
     * to be delivered in HTML. In JSON text, a string cannot contain a control
     * character or an unescaped quote or backslash.<br>
-    * <strong>CAUTION:</strong> if <code>string</code> represents a
-    * javascript function, translation of characters will not take place. This
-    * will produce a non-conformant JSON text.
     *
     * @param string A String
     * @return A String correctly formatted for insertion in a JSON text.
     */
    public static String quote( String string ) {
-      if( isFunction( string ) ) {
-         return string;
-      }
       if( string == null || string.length() == 0 ) {
          return "\"\"";
       }
@@ -680,14 +674,17 @@ public final class JSONUtils {
     * @throws JSONException If the value is or contains an invalid number.
     */
    public static String valueToString( Object value ) {
+      if( value instanceof JSONString ){
+         return ((JSONString) value).toJSONString();
+      }
+      if( JSONUtils.isString( value ) ){
+         return quote( value.toString() );
+      }
       if( value == null || isNull( value ) ){
          return "null";
       }
       if( value instanceof JSONFunction ){
          return ((JSONFunction) value).toString();
-      }
-      if( value instanceof JSONString ){
-          return ((JSONString) value).toJSONString();
       }
       if( value instanceof Number ){
          return numberToString( (Number) value );
@@ -699,14 +696,17 @@ public final class JSONUtils {
    }
 
     public static String valueToCanonicalString( Object value ) {
+       if( value instanceof JSONString ){
+          return ((JSONString) value).toJSONString();
+       }
+       if( JSONUtils.isString( value ) ){
+          return quote( value.toString() );
+       }
        if( value == null || isNull( value ) ){
           return "null";
        }
        if( value instanceof JSONFunction ){
           return value.toString(); // there's really no canonical form for functions
-       }
-       if( value instanceof JSONString ){
-           return ((JSONString) value).toJSONString();
        }
        if( value instanceof Number ){
           return numberToString( (Number) value ).toLowerCase();
@@ -732,14 +732,17 @@ public final class JSONUtils {
     * @throws JSONException If the object contains an invalid number.
     */
    public static String valueToString( Object value, int indentFactor, int indent ) {
+      if( value instanceof JSONString ){
+         return ((JSONString) value).toJSONString();
+      }
+      if( JSONUtils.isString( value ) ){
+         return quote( value.toString() );
+      }
       if( value == null || isNull( value ) ){
          return "null";
       }
       if( value instanceof JSONFunction ){
          return value.toString();
-      }
-      if( value instanceof JSONString ){
-         return ((JSONString) value).toJSONString();
       }
       if( value instanceof Number ){
          return numberToString( (Number) value );

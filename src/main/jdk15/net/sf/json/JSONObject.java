@@ -1027,9 +1027,6 @@ public final class JSONObject extends AbstractJSON implements JSON, Map<String,O
                   continue;
                }
                if( jsonPropertyFilter == null || !jsonPropertyFilter.apply( tokener, key, v ) ){
-                  if( quoted && v instanceof String && (JSONUtils.mayBeJSON( (String) v ) || JSONUtils.isFunction( v ))){
-                     v = JSONUtils.DOUBLE_QUOTE + v + JSONUtils.DOUBLE_QUOTE;
-                  }
                   if( jsonObject.properties.containsKey( key ) ){
                      jsonObject.accumulate( key, v, jsonConfig );
                      firePropertySetEvent( key, v, true, jsonConfig );
