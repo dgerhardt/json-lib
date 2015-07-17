@@ -227,7 +227,11 @@ abstract class AbstractJSON implements JSON {
    }
 
    protected Object _processValue( Object value, JsonConfig jsonConfig ) {
-      if( JSONNull.getInstance().equals( value ) ) {
+      if( value instanceof JSONString ) {
+        return JSONSerializer.toJSON( (JSONString) value, jsonConfig );
+      } else if( JSONUtils.isString( value ) ) {
+        return String.valueOf( value );
+      } else if( JSONNull.getInstance().equals( value ) ) {
          return JSONNull.getInstance();
       } else if( Class.class.isAssignableFrom( value.getClass() ) || value instanceof Class ) {
          return ((Class) value).getName();
@@ -236,14 +240,10 @@ abstract class AbstractJSON implements JSON {
             value = JSONFunction.parse( (String) value );
          }
          return value;
-      } else if( value instanceof JSONString ) {
-         return JSONSerializer.toJSON( (JSONString) value, jsonConfig );
       } else if( value instanceof JSON ) {
          return JSONSerializer.toJSON( value, jsonConfig );
       } else if( JSONUtils.isArray( value ) ) {
          return JSONArray.fromObject( value, jsonConfig );
-      } else if( JSONUtils.isString( value ) ) {
-         return String.valueOf( value );
       } else if( JSONUtils.isNumber( value ) ) {
          JSONUtils.testValidity( value );
          return JSONUtils.transformNumber( (Number) value );
