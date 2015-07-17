@@ -1,10 +1,27 @@
-Json-lib with auto-expansion of properties
-=============
+# JSON-lib
 
-The XML serialization is extended to handle automatic expansion of properties for arrays that contains objects.
+## About this fork
 
-Source file to be serialized to and from JSON
--------------
+This is a fork of [JSON-lib](https://github.com/aalmiray/Json-lib) which fixes
+handling of strings containing JSON-like syntax. The original JSON-lib parsed
+JSON in strings if they contained _array_, _object_ or _function_ syntax or the
+`null` keyword.
+
+Please note that JSON-lib and this fork are not actively maintained. This fork
+was solely created to fix the issues mentioned above for legacy code. If you are
+already using JSON-lib feel free to use this fork. But if you are looking for a
+modern JSON parser, I recommend you have a look at
+[Jackson](https://github.com/FasterXML/jackson).
+
+
+## Auto-expansion of properties
+
+The XML serialization is extended to handle automatic expansion of properties
+for arrays that contains objects.
+
+
+### Source file to be serialized to and from JSON
+
 ```xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Document DOMVersion="8.0" Self="d">
@@ -29,8 +46,8 @@ Source file to be serialized to and from JSON
 
 file.xml
 
-Original json-lib
--------
+
+### Original JSON-lib
 
 This code
 
@@ -67,8 +84,7 @@ will render:
 ```
 
 
-AutoExpand
--------
+### AutoExpand
 
 This code
 
