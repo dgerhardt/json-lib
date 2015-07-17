@@ -15,9 +15,14 @@
  */
 package net.sf.json;
 
+import java.beans.PropertyDescriptor;
 import java.io.IOException;
 import java.io.Writer;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
+import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.ConcurrentModificationException;
@@ -86,11 +91,11 @@ import org.apache.commons.lang.StringUtils;
  *
  * @author JSON.org
  */
-public final class JSONArray extends AbstractJSON implements JSON, List, Comparable {
+public final class JSONArray extends AbstractJSON implements JSON, List<Object>, Comparable {
    /**
     * Creates a JSONArray.<br>
     * Inspects the object type to call the correct JSONArray factory method.
-    * Accepts JSON formatted strings, arrays and Collections.
+    * Accepts JSON formatted strings, arrays, Collections and Enums.
     *
     * @param object
     * @throws JSONException if the object can not be converted to a proper
@@ -103,7 +108,7 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
    /**
     * Creates a JSONArray.<br>
     * Inspects the object type to call the correct JSONArray factory method.
-    * Accepts JSON formatted strings, arrays and Collections.
+    * Accepts JSON formatted strings, arrays, Collections and Enums.
     *
     * @param object
     * @throws JSONException if the object can not be converted to a proper
@@ -123,7 +128,7 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
       }else if( object != null && object.getClass()
             .isArray() ){
          Class type = object.getClass()
-               .getComponentType();  
+               .getComponentType();
          if( !type.isPrimitive() ){
             return _fromArray( (Object[]) object, jsonConfig );
          }else{
@@ -155,6 +160,11 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
          fireElementAddedEvent( 0, jsonArray.get( 0 ), jsonConfig );
          fireArrayStartEvent( jsonConfig );
          return jsonArray;
+      }else if( object instanceof Enum ){
+         return _fromArray( (Enum) object, jsonConfig );
+      }else if( object instanceof Annotation || (object != null && object.getClass()
+            .isAnnotation()) ){
+         throw new JSONException( "Unsupported type" );
       }else if( JSONUtils.isObject( object ) ){
          fireArrayStartEvent( jsonConfig );
          JSONArray jsonArray = new JSONArray().element( JSONObject.fromObject( object, jsonConfig ) );
@@ -164,6 +174,45 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
       }else{
          throw new JSONException( "Unsupported type" );
       }
+   }
+
+   /**
+    * Get the collection type from a getter or setter, or null if no type was
+    * found.<br/>
+    * Contributed by [Matt Small @ WaveMaker].
+    */
+   public static Class[] getCollectionType( PropertyDescriptor pd, boolean useGetter )
+         throws JSONException {
+
+      Type type;
+      if( useGetter ){
+         Method m = pd.getReadMethod();
+         type = m.getGenericReturnType();
+      }else{
+         Method m = pd.getWriteMethod();
+         Type[] gpts = m.getGenericParameterTypes();
+
+         if( 1 != gpts.length ){
+            throw new JSONException( "method " + m + " is not a standard setter" );
+         }
+         type = gpts[0];
+      }
+
+      if( !(type instanceof ParameterizedType) ){
+         return null;
+         // throw new JSONException("type not instanceof ParameterizedType:
+         // "+type.getClass());
+      }
+
+      ParameterizedType pType = (ParameterizedType) type;
+      Type[] actualTypes = pType.getActualTypeArguments();
+
+      Class[] ret = new Class[actualTypes.length];
+      for( int i = 0; i < ret.length; i++ ){
+         ret[i] = (Class) actualTypes[i];
+      }
+
+      return ret;
    }
 
    /**
@@ -323,14 +372,14 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
    }
 
    /**
-    * Creates a Collection from a JSONArray.
+    * Returns a List or a Set taking generics into account.<br/>
     */
    public static Collection toCollection( JSONArray jsonArray ) {
       return toCollection( jsonArray, new JsonConfig() );
    }
 
    /**
-    * Creates a Collection from a JSONArray.
+    * Returns a List or a Set taking generics into account.<br/>
     */
    public static Collection toCollection( JSONArray jsonArray, Class objectClass ) {
       JsonConfig jsonConfig = new JsonConfig();
@@ -339,8 +388,8 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
    }
 
    /**
-    * Returns a List or a Set taking generics into account.<br/> Contributed by
-    * [Matt Small @ WaveMaker].
+    * Returns a List or a Set taking generics into account.<br/>
+    * Contributed by [Matt Small @ WaveMaker].
     */
    public static Collection toCollection( JSONArray jsonArray, JsonConfig jsonConfig ) {
       Collection collection = null;
@@ -381,6 +430,7 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
                   || Boolean.class.isAssignableFrom( type ) || JSONUtils.isNumber( type )
                   || Character.class.isAssignableFrom( type )
                   || JSONFunction.class.isAssignableFrom( type ) ){
+
                if( objectClass != null && !objectClass.isAssignableFrom( type ) ){
                   value = JSONUtils.getMorpherRegistry()
                      .morph( objectClass, value );
@@ -401,6 +451,88 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
 
       return collection;
    }
+   /*
+   public static Collection toCollection( JSONArray jsonArray, JsonConfig jsonConfig ) {
+      Collection collection = null;
+      Class collectionType = jsonConfig.getCollectionType();
+      Class enclosedType = jsonConfig.getEnclosedType();
+
+      if( collectionType.isInterface() ){
+         if( collectionType.equals( List.class ) ){
+            collection = new ArrayList();
+         }else if( collectionType.equals( Set.class ) ){
+            collection = new HashSet();
+         }else{
+            throw new JSONException( "unknown interface: " + collectionType );
+         }
+      }else{
+         try{
+            collection = (Collection) collectionType.newInstance();
+         }catch( InstantiationException e ){
+            throw new JSONException( e );
+         }catch( IllegalAccessException e ){
+            throw new JSONException( e );
+         }
+      }
+
+      Class objectClass = jsonConfig.getRootClass();
+      Map classMap = jsonConfig.getClassMap();
+
+      int size = jsonArray.size();
+      for( int i = 0; i < size; i++ ){
+         Object value = jsonArray.get( i );
+         Class enclosedTypeE = enclosedType;
+
+         if( null == enclosedTypeE ){
+            enclosedTypeE = value.getClass();
+         }
+
+         if( JSONUtils.isNull( value ) ){
+            collection.add( null );
+         }else{
+            if( JSONArray.class.isAssignableFrom( value.getClass() ) ){
+               //throw new RuntimeException( "can't have nested collections" );
+                collection.add( toCollection( (JSONArray) value, jsonConfig ) );
+            }else if( String.class.isAssignableFrom( enclosedTypeE )
+                  || Boolean.class.isAssignableFrom( enclosedTypeE )
+                  || JSONUtils.isNumber( enclosedTypeE )
+                  || Character.class.isAssignableFrom( enclosedTypeE )
+                  || JSONFunction.class.isAssignableFrom( enclosedTypeE ) ){
+
+               if( !value.getClass()
+                     .isAssignableFrom( enclosedTypeE ) ){
+                  throw new JSONException( "can't assign value " + value + " of type "
+                        + value.getClass() + " to Collection of type " + enclosedTypeE );
+               }
+               collection.add( value );
+            }else{
+               try{
+                  if( JSON.class.isAssignableFrom( enclosedTypeE ) ){
+                     ret.add( JSONObject.toBean( (JSONObject) value ) );
+                  }else{
+                     Object newRoot = enclosedTypeE.newInstance();
+                     ret.add( JSONObject.toBean( (JSONObject) value, newRoot, jsonConfig ) );
+                  }
+               }catch( JSONException jsone ){
+                  throw jsone;
+               }catch( Exception e ){
+                  throw new JSONException( e );
+               }
+               if( objectClass != null ){
+                  JsonConfig jsc = jsonConfig.copy();
+                  jsc.setRootClass( objectClass );
+                  jsc.setClassMap( classMap );
+                  collection.add( JSONObject.toBean( (JSONObject) value, jsc ) );
+               }else{
+                  collection.add( JSONObject.toBean( (JSONObject) value ) );
+               }
+            }
+         }
+      }
+
+      return collection;
+   }
+   */
 
    /**
     * Creates a List from a JSONArray.<br>
@@ -554,7 +686,6 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
          }
       }
       fireArrayStartEvent( jsonConfig );
-      
       JSONArray jsonArray = new JSONArray();
       for( int i = 0; i < array.length; i++ ){
          Boolean b = array[i] ? Boolean.TRUE : Boolean.FALSE;
@@ -589,7 +720,6 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
          }
       }
       fireArrayStartEvent( jsonConfig );
-      
       JSONArray jsonArray = new JSONArray();
       for( int i = 0; i < array.length; i++ ){
          Number n = JSONUtils.transformNumber( new Byte( array[i] ) );
@@ -624,7 +754,6 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
          }
       }
       fireArrayStartEvent( jsonConfig );
-      
       JSONArray jsonArray = new JSONArray();
       for( int i = 0; i < array.length; i++ ){
          Character c = new Character( array[i] );
@@ -659,11 +788,10 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
          }
       }
       fireArrayStartEvent( jsonConfig );
-      
       JSONArray jsonArray = new JSONArray();
       try{
          for( int i = 0; i < array.length; i++ ){
-            Double d = new Double( array[i] );
+            Double d = array[i];
             JSONUtils.testValidity( d );
             jsonArray.addValue( d, jsonConfig );
             fireElementAddedEvent( i, d, jsonConfig );
@@ -675,6 +803,45 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
       }
 
       removeInstance( array );
+      fireArrayEndEvent( jsonConfig );
+      return jsonArray;
+   }
+
+   /**
+    * Construct a JSONArray from an Enum value.
+    *
+    * @param e A enum value.
+    * @throws JSONException If there is a syntax error.
+    */
+   private static JSONArray _fromArray( Enum e, JsonConfig jsonConfig ) {
+      if( !addInstance( e ) ){
+         try{
+            return jsonConfig.getCycleDetectionStrategy()
+                  .handleRepeatedReferenceAsArray( e );
+         }catch( JSONException jsone ){
+            removeInstance( e );
+            fireErrorEvent( jsone, jsonConfig );
+            throw jsone;
+         }catch( RuntimeException re ){
+            removeInstance( e );
+            JSONException jsone = new JSONException( re );
+            fireErrorEvent( jsone, jsonConfig );
+            throw jsone;
+         }
+      }
+      fireArrayStartEvent( jsonConfig );
+      JSONArray jsonArray = new JSONArray();
+      if( e != null ){
+         jsonArray.addValue( e, jsonConfig );
+         fireElementAddedEvent( 0, jsonArray.get( 0 ), jsonConfig );
+      }else{
+         JSONException jsone = new JSONException( "enum value is null" );
+         removeInstance( e );
+         fireErrorEvent( jsone, jsonConfig );
+         throw jsone;
+      }
+
+      removeInstance( e );
       fireArrayEndEvent( jsonConfig );
       return jsonArray;
    }
@@ -701,11 +868,10 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
          }
       }
       fireArrayStartEvent( jsonConfig );
-      
       JSONArray jsonArray = new JSONArray();
       try{
          for( int i = 0; i < array.length; i++ ){
-            Float f = new Float( array[i] );
+            Float f = array[i];
             JSONUtils.testValidity( f );
             jsonArray.addValue( f, jsonConfig );
             fireElementAddedEvent( i, f, jsonConfig );
@@ -743,7 +909,6 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
          }
       }
       fireArrayStartEvent( jsonConfig );
-      
       JSONArray jsonArray = new JSONArray();
       for( int i = 0; i < array.length; i++ ){
          Number n = new Integer( array[i] );
@@ -778,7 +943,6 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
          }
       }
       fireArrayStartEvent( jsonConfig );
-      
       JSONArray jsonArray = new JSONArray();
       for( int i = 0; i < array.length; i++ ){
          Number n = JSONUtils.transformNumber( new Long( array[i] ) );
@@ -810,7 +974,6 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
          }
       }
       fireArrayStartEvent( jsonConfig );
-      
       JSONArray jsonArray = new JSONArray();
       try{
          for( int i = 0; i < array.length; i++ ){
@@ -856,7 +1019,6 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
          }
       }
       fireArrayStartEvent( jsonConfig );
-      
       JSONArray jsonArray = new JSONArray();
       for( int i = 0; i < array.length; i++ ){
          Number n = JSONUtils.transformNumber( new Short( array[i] ) );
@@ -886,7 +1048,6 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
          }
       }
       fireArrayStartEvent( jsonConfig );
-      
       JSONArray jsonArray = new JSONArray();
       try{
          int i = 0;
@@ -928,7 +1089,6 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
          }
       }
       fireArrayStartEvent( jsonConfig );
-      
       JSONArray jsonArray = new JSONArray();
       int index = 0;
       for( Iterator elements = array.iterator(); elements.hasNext(); ){
@@ -947,6 +1107,7 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
    }
 
    private static JSONArray _fromJSONTokener( JSONTokener tokener, JsonConfig jsonConfig ) {
+
       JSONArray jsonArray = new JSONArray();
       int index = 0;
 
@@ -954,7 +1115,6 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
          if( tokener.nextClean() != '[' ){
             throw tokener.syntaxError( "A JSONArray text must start with '['" );
          }
-
          fireArrayStartEvent( jsonConfig );
          if( tokener.nextClean() == ']' ){
             fireArrayEndEvent( jsonConfig );
@@ -970,12 +1130,7 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
                tokener.back();
                Object v = tokener.nextValue( jsonConfig );
                if( !JSONUtils.isFunctionHeader( v ) ){
-                  if( v instanceof String && JSONUtils.mayBeJSON( (String) v ) ){
-                     jsonArray.addValue( JSONUtils.DOUBLE_QUOTE + v + JSONUtils.DOUBLE_QUOTE,
-                           jsonConfig );
-                  }else{
                      jsonArray.addValue( v, jsonConfig );
-                  }
                   fireElementAddedEvent( index, jsonArray.get( index++ ), jsonConfig );
                }else{
                   // read params if any
@@ -1039,11 +1194,11 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
 
    private static void processArrayDimensions( JSONArray jsonArray, List dims, int index ) {
       if( dims.size() <= index ){
-         dims.add( new Integer( jsonArray.size() ) );
+         dims.add(jsonArray.size());
       }else{
          int i = ((Integer) dims.get( index )).intValue();
          if( jsonArray.size() > i ){
-            dims.set( index, new Integer( jsonArray.size() ) );
+            dims.set( index, jsonArray.size());
          }
       }
       for( Iterator i = jsonArray.iterator(); i.hasNext(); ){
@@ -1059,7 +1214,7 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
    /**
     * The List where the JSONArray's properties are kept.
     */
-   private List elements;
+   private List<Object> elements;
 
    /**
     * A flag for XML processing.
@@ -1070,7 +1225,7 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
     * Construct an empty JSONArray.
     */
    public JSONArray() {
-      this.elements = new ArrayList();
+      this.elements = new ArrayList<Object>();
    }
 
    public void add( int index, Object value ) {
@@ -1098,9 +1253,9 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
       if( collection == null || collection.size() == 0 ){
          return false;
       }
-      for( Iterator i = collection.iterator(); i.hasNext(); ){
-         element( i.next(), jsonConfig );
-      }
+       for (Object a : collection) {
+           element(a, jsonConfig);
+       }
       return true;
    }
 
@@ -1113,9 +1268,9 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
          return false;
       }
       int offset = 0;
-      for( Iterator i = collection.iterator(); i.hasNext(); ){
-         this.elements.add( index + (offset++), processValue( i.next(), jsonConfig ) );
-      }
+       for (Object a : collection) {
+           this.elements.add(index + (offset++), processValue(a, jsonConfig));
+       }
       return true;
    }
 
@@ -1222,7 +1377,7 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
     * @return this.
     */
    public JSONArray element( double value ) {
-      Double d = new Double( value );
+      Double d = value;
       JSONUtils.testValidity( d );
       return element( d );
    }
@@ -1510,7 +1665,7 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
     * @return this.
     */
    public JSONArray element( long value ) {
-      return element( JSONUtils.transformNumber( new Long( value ) ) );
+      return element( JSONUtils.transformNumber(value) );
    }
 
    /**
@@ -2281,32 +2436,28 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
       return sb.toString();
    }
 
-   protected void write(Writer writer, WritingVisitor visitor) throws IOException {
-      try{
-         boolean b = false;
-         int len = size();
+    protected void write(Writer writer, WritingVisitor visitor) throws IOException {
+        boolean b = false;
+        int len = size();
 
-         writer.write( '[' );
+        writer.write( '[' );
 
-         for( int i = 0; i < len; i += 1 ){
-            if( b ){
-               writer.write( ',' );
-            }
-            Object v = this.elements.get( i );
-            if( v instanceof JSON ){
-               visitor.on( (JSON) v, writer );
-            }else{
-               visitor.on( v, writer );
-            }
-            b = true;
-         }
-         writer.write( ']' );
-      }catch( IOException e ){
-         throw new JSONException( e );
-      }
-   }
+        for( int i = 0; i < len; i += 1 ){
+           if( b ){
+              writer.write( ',' );
+           }
+           Object v = this.elements.get( i );
+           if( v instanceof JSON ){
+               visitor.on((JSON)v,writer);
+           }else{
+               visitor.on(v,writer);
+           }
+           b = true;
+        }
+        writer.write( ']' );
+    }
 
-   /**
+    /**
     * Adds a String without performing any conversion on it.
     */
    protected JSONArray addString( String str ) {
@@ -2332,6 +2483,11 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
    protected Object _processValue( Object value, JsonConfig jsonConfig ) {
       if( value instanceof JSONTokener ) {
          return _fromJSONTokener( (JSONTokener) value, jsonConfig );
+      }else if( value != null && Enum.class.isAssignableFrom( value.getClass() ) ){
+         return ((Enum) value).name();
+      }else if( value instanceof Annotation || (value != null && value.getClass()
+            .isAnnotation()) ){
+         throw new JSONException( "Unsupported type" );
       }
       return super._processValue( value, jsonConfig );
    }
@@ -2360,15 +2516,15 @@ public final class JSONArray extends AbstractJSON implements JSON, List, Compara
       }
       return _processValue( value, jsonConfig );
    }
-   
+
    private class JSONArrayListIterator implements ListIterator {
       int currentIndex = 0;
       int lastIndex = -1;
-      
+
       JSONArrayListIterator() {
-         
+
       }
-      
+
       JSONArrayListIterator( int index ) {
          currentIndex = index;
       }
