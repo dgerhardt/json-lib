@@ -243,32 +243,7 @@ abstract class AbstractJSON implements JSON {
       } else if( JSONUtils.isArray( value ) ) {
          return JSONArray.fromObject( value, jsonConfig );
       } else if( JSONUtils.isString( value ) ) {
-         String str = String.valueOf( value );
-         if( JSONUtils.hasQuotes( str ) ){
-            String stripped = JSONUtils.stripQuotes( str );
-            if( JSONUtils.isFunction( stripped )){
-               return JSONUtils.DOUBLE_QUOTE + stripped + JSONUtils.DOUBLE_QUOTE;
-            }
-            if(stripped.startsWith("[") && stripped.endsWith("]")) {
-               return stripped;
-            }
-            if(stripped.startsWith("{") && stripped.endsWith("}")) {
-               return stripped;
-            }
-            return str;
-         } else if( JSONUtils.isJsonKeyword( str, jsonConfig ) ) {
-            if( jsonConfig.isJavascriptCompliant() && "undefined".equals( str )){
-               return JSONNull.getInstance();
-            }
-            return str;
-         } else if( JSONUtils.mayBeJSON( str ) ) {
-            try {
-               return JSONSerializer.toJSON( str, jsonConfig );
-            } catch( JSONException jsone ) {
-               return str;
-            }
-         }
-         return str;
+         return String.valueOf( value );
       } else if( JSONUtils.isNumber( value ) ) {
          JSONUtils.testValidity( value );
          return JSONUtils.transformNumber( (Number) value );
